@@ -1,0 +1,35 @@
+÷defVar --name emailConnection --type EmailConnection
+defVar --name wordInSubject --type List --innertype String --value "[projectExample]"
+defVar --name notepadWindow --type Window
+defVar --name subject --type String
+defVar --name emailBody --type String
+defVar --name date --type DateTime
+defVar --name currentMenssage --type EmailMessage
+defVar --name fileName --type String
+defVar --name user --type String
+defVar --name password --type SecureString
+defVar --name desktopPath --type String
+defVar --name folderExist --type Boolean
+getSpecialFolder --folder "Desktop" desktopPath=value
+ifFolder --path "${desktopPath}\\Example" folderExist=value
+if --left "${folderExist}" --operator "Is_True" --negate 
+	createDir --path "${desktopPath}\\Example"
+endIf
+getVaultItem --name academyEmail user=userName password=password
+imapConnect --mailhost "imap.gmail.com" --mailport 993 --usessl  --username "${user}" --mailusername "${user}" --mailpassword "${password}" emailConnection=value
+emailApplySearchFilters --subjectdirective "All" --inclusivesubject ${wordInSubject} --wordsdirective "All" --connection ${emailConnection}
+launchOrAttach --executablepath "notepad.exe" --useregex  --regexPattern "(?<name>.*)\\s-\\sNotepad" --regexOptions "IgnoreCase" notepadWindow=value
+foreach --collection "${emailConnection}" --variable "${currentMenssage}"
+	emailRead --message ${currentMenssage} emailBody=body date=receiveddate subject=subject
+	getRegex --text "${subject}" --regexPattern "\\w*$" --regexOptions "0" fileName=value
+	replaceText --texttoparse "${emailBody}" --useregex  --pattern "\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}\\b" --regexOptions "IgnoreCase" --replacement replacedEmail emailBody=value
+	concatTexts --text "Date: ${date}\r\n" --value "${emailBody}" emailBody=value
+	focusWindow --window ${notepadWindow}
+	clickOnMenu --window ${notepadWindow} --menupath "file\r\nnew"
+	setClipboard --text "${emailBody}" --mode "Text"
+	paste
+	clickOnMenu --window ${notepadWindow} --menupath "file\r\nsave"
+	removeDiacritics --text "${fileName}" fileName=value
+	handleSaveFileDialog --filepath "${desktopPath}\\Example\\${fileName}.txt" --useregex  --regexPattern "\\bSa\\w*\\s\\w*\\b" --regexOptions "IgnoreCase"
+endFor
+closeWindow --window ${notepadWindow}*	20.12.0.0
