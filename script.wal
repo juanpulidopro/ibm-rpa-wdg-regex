@@ -1,0 +1,58 @@
+Õ#defVar --name desktopPath --type String
+defVar --name clients --type String
+defVar --name clientsTable --type DataTable
+defVar --name count --type Numeric
+defVar --name name --type String
+defVar --name personalEmail --type String
+defVar --name phone --type String
+defVar --name gender --type String
+defVar --name applicationEmail --type String
+defVar --name applicationPassword --type String
+defVar --name numberTable --type DataTable
+defVar --name firstFormatedNumber --type String
+defVar --name secondFormatedNumber --type String
+defVar --name thirdFormatedNumber --type String
+defVar --name dbConnection --type DbConnection
+defVar --name userEmail --type String
+defVar --name passwordEmail --type SecureString
+defVar --name emailConnection --type EmailConnection
+defVar --name tableRegistredClients --type DataTable
+defVar --name emailToSend --type List --innertype String
+goSub --label connections
+goSub --label dataManipulation
+goSub --label sendEmail
+beginSub --name connections
+getSpecialFolder --folder "Desktop" desktopPath=value
+sqliteConnect --connectionString "Data Source=\"${desktopPath}\\dbClients.db\"; Version=3; UseUTF16Encoding=True;" dbConnection=connection
+getVaultItem --name academyEmail userEmail=userName passwordEmail=password
+imapConnect --mailhost "imap.gmail.com" --mailport 993 --usessl  --UseConnectionToSend  --smtpcredentials  --smtphost "smtp.gmail.com" --smtpport 465 --smtpusername "${userEmail}" --smtppassword "${passwordEmail}" --smtpusessl  --username "${userEmail}" --mailusername "${userEmail}" --mailpassword "${passwordEmail}" emailConnection=value
+endSub
+beginSub --name dataManipulation
+getTextFromFile --filename "${desktopPath}/clients.txt" clients=text
+getRegexTable --text "${clients}" --regexPattern "Name:\\s(?<name>.*)\\s\\|\\sEmail:\\s(?<email>\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}\\b)\\s\\|\\sPhone:\\s(?<phone>\\d{11}|\\d{10})\\s\\|\\sGender:\\s(?<gender>\\w+)" --regexOptions "IgnoreCase" clientsTable=value
+for --variable ${count} --from 1 --to ${clientsTable.Rows} --step 1
+	mapTableRow --dataTable ${clientsTable} --row ${count} --mappings "name=name=${name},name=email=${personalEmail},name=phone=${phone},name=gender=${gender}"
+	removeDiacritics --text "${name}" applicationEmail=value
+	changeTextCase --text "${applicationEmail}" --type "Lower" applicationEmail=value
+	replaceText --texttoparse "${applicationEmail}" --useregex  --pattern "\\s" --regexOptions "0" --replacement "." applicationEmail=value
+	concatTexts --text "${applicationEmail}" --value "@ficticiusCompany.com" applicationEmail=value
+	createRandomText --useuppercaseletters  --uselowercaseletters  --usedigits  --minimumlength 15 --maximumlength 20 applicationPassword=value
+	if --left "${phone}" --operator "Matches" --right "\\d{11}"
+		getRegexTable --text "${phone}" --regexPattern "(\\d{2})(\\d{5})(\\d{4})" --regexOptions "0" numberTable=value
+	else
+		getRegexTable --text "${phone}" --regexPattern "(\\d{2})(\\d{4})(\\d{4})" --regexOptions "0" numberTable=value
+	endIf
+	mapTableRow --dataTable ${numberTable} --row 1 --mappings "number=5=${firstFormatedNumber},number=7=${secondFormatedNumber},number=9=${thirdFormatedNumber}"
+	setVar --name "${phone}" --value "(${firstFormatedNumber})${secondFormatedNumber}-${thirdFormatedNumber}"
+	sqlExecute --connection ${dbConnection} --statement "INSERT INTO Clients (name, applicationEmail, personalEmail, applicationPassword, gender, phone, status) VALUES (\'${name}\', \'${applicationEmail}\', \'${personalEmail}\', \'${applicationPassword}\', \'${gender}\', \'${phone}\', 1)"
+next
+endSub
+beginSub --name sendEmail
+sqlExecuteReader --connection ${dbConnection} --statement "SELECT name, personalEmail, applicationEmail, applicationPassword FROM Clients" tableRegistredClients=value
+for --variable ${count} --from 1 --to 10 --step 1
+	mapTableRow --dataTable ${tableRegistredClients} --row ${count} --mappings "number=1=${name},number=2=${personalEmail},number=3=${applicationEmail},number=4=${applicationPassword}"
+	add --collection "${emailToSend}" --value "${personalEmail}"
+	emailSend --connection ${emailConnection} --to ${emailToSend} --from "${userEmail}" --subject Credentials --bodytype "Text" --body "Congratulations ${name}!!!!!!!! \r\n\r\n \r\n\r\nYour access to the application \"Application Example\" has been successfully released, please access using the credentials below. \r\n\r\n \r\n\r\nEmail: ${applicationEmail} \r\n\r\nPassword: ${applicationPassword}"
+	clear --collection "${emailToSend}"
+next
+endSub*20.7.3.0
